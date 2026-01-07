@@ -500,6 +500,14 @@ def sort_jav(s):
             temp.append(fullpath)
 
     count = 0
+    stats = {
+        'total': len(temp),
+        'success': 0,
+        'skipped_no_id': 0,
+        'skipped_not_found': 0,
+        'errors': 0
+    }
+
     for path in temp:
         count += 1
         try:
@@ -514,6 +522,7 @@ def sort_jav(s):
                 vid_id = vid_id.upper()
         except Exception as e:
             print("Not sorting {} as it is does not look like a JAV ID".format(vid_id))
+            stats['skipped_no_id'] += 1
             continue
         html = get_javlibrary_url(vid_id)
 
@@ -522,44 +531,68 @@ def sort_jav(s):
                 print("Could not find video on javlibrary so skipping " + vid_id)
             except:
                 print("Skipping one file with unknown characters in the file name")
+            stats['skipped_not_found'] += 1
             continue
 
-        # rename the file according to our convention
-        new_fname = rename_file(path, html, s, vid_id)
+        try:
+            # rename the file according to our convention
+            new_fname = rename_file(path, html, s, vid_id)
 
-        # write a txt file containing html metadata for parsing with Set-JAVNfo.ps1 script
-        if s['include-html-txt']:
-            # write html to txt file and move to folder
-            split_fname = str(os.path.splitext(new_fname)[0])
-            base_fname = os.path.basename(new_fname)
-            split_base_fname = str(os.path.splitext(base_fname)[0])
-            base = strip_partial_path_from_file(split_fname)
-            text_file = open(split_fname + '.txt', "w", encoding="utf-8")
-            text_file.write(html)
-
-            # write actresses to html metadata file
-            actress_string = get_actress_string_txt(html, s)
-            text_file.write("\n<ActressSorted>")
-            text_file.write(actress_string)
-            text_file.write("</ActressSorted>")
-            text_file.close()
-
-        # move the file into a folder (if we say to)
-        if s['move-video-to-new-folder']:
-            path = create_and_move_video_into_folder(new_fname, s, vid_id, html)
+            # write a txt file containing html metadata for parsing with Set-JAVNfo.ps1 script
             if s['include-html-txt']:
-                move(split_fname + '.txt', (os.path.splitext(path))[0] + '.txt')
+                # write html to txt file and move to folder
+                split_fname = str(os.path.splitext(new_fname)[0])
+                base_fname = os.path.basename(new_fname)
+                split_base_fname = str(os.path.splitext(base_fname)[0])
+                base = strip_partial_path_from_file(split_fname)
+                text_file = open(split_fname + '.txt', "w", encoding="utf-8")
+                text_file.write(html)
 
-        # get the cover (if we say to)
-        if s['include-cover']:
-            get_cover_for_video(path, vid_id, s, html)
+                # write actresses to html metadata file
+                actress_string = get_actress_string_txt(html, s)
+                text_file.write("\n<ActressSorted>")
+                text_file.write(actress_string)
+                text_file.write("</ActressSorted>")
+                text_file.close()
+
+            # move the file into a folder (if we say to)
+            if s['move-video-to-new-folder']:
+                path = create_and_move_video_into_folder(new_fname, s, vid_id, html)
+                if s['include-html-txt']:
+                    move(split_fname + '.txt', (os.path.splitext(path))[0] + '.txt')
+
+            # get the cover (if we say to)
+            if s['include-cover']:
+                get_cover_for_video(path, vid_id, s, html)
+
+            stats['success'] += 1
+        except Exception as e:
+            print("Error processing {}: {}".format(vid_id, e))
+            stats['errors'] += 1
+
+    print("\n" + "="*50)
+    print(" Sorting Complete!")
+    print("="*50)
+    print(f" Total Files:        {stats['total']}")
+    print(f" Successfully Sorted:{stats['success']}")
+    print(f" Skipped (No ID):    {stats['skipped_no_id']}")
+    print(f" Skipped (Not Found):{stats['skipped_not_found']}")
+    if stats['errors'] > 0:
+        print(f" Errors:             {stats['errors']}")
+    print("="*50 + "\n")
 
 if __name__ == '__main__':
     try:
+        if not os.path.exists('settings_sort_jav.ini'):
+            print("\nError: 'settings_sort_jav.ini' not found.")
+            print("Please make sure the settings file is in the same directory as the script.")
+            input("Press Enter to exit.")
+            exit(1)
+
         print("Sorting your JAV, please wait...")
         settings = read_file('settings_sort_jav.ini')
         sort_jav(settings)
         input("Press Enter to finish.")
     except Exception as e:
-        print(e)
+        print(f"\nAn unexpected error occurred: {e}")
         print("Panic! Go find help.")
