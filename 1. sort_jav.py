@@ -358,29 +358,53 @@ def get_cover_for_video(path, vid_id, s, html):
     # path needs to be stripped but otherwise we can use it to store the video
     # html should have the cover there we can take
     img_link = get_image_url_from_html(html)
-    # TODO:
-    # create the path name based on the settings file
+
     base = strip_partial_path_from_file(path)
-    fname = strip_definition_from_video(vid_id)
+
     if s['do-not-rename-file']:
-        fullpath = (os.path.splitext(path)[0])
+        fname = strip_file_name(path)
+        fullpath = os.path.join(base, fname)
         save_image_from_url_to_path(fullpath, img_link)
     else:
-        if (s['include-actress-name-in-cover']):
-            if (s['include-cover-all']):
-                if(s['include-actress-in-video-name']):
-                    if s['video-number']:
-                        fname += s['delimiter-between-multiple-videos'] + s['video-number'] + s['delimiter-between-video-name-actress'] 
-                        actress_string = get_actress_string(html, s)
-                        fname += actress_string
-                    else:
-                        fname += s['delimiter-between-video-name-actress'] 
-                        actress_string = get_actress_string(html, s)
-                        fname += actress_string
+        fname = strip_definition_from_video(vid_id)
+
+        # Determine parts to append
+        parts = []
+
+        # Video Number
+        if s['include-cover-all'] and s['video-number']:
+            parts.append(s['video-number'])
+
+        # Actress Name
+        # Logic: If include-actress-name-in-cover is True, we add it.
+        # But we also need to respect include-cover-all for multi-part videos?
+        # The original logic seemed to imply include-cover-all is a prerequisite for fancier naming?
+        # Actually, "include-cover-all" description says: "create a cover for all videos if it has multiple parts"
+        # But here we are processing ONE video file.
+        # If include-actress-name-in-cover is True, we should include it.
+
+        actress_part = None
+        if s['include-actress-name-in-cover']:
+             actress_part = get_actress_string(html, s)
+
+        # Assemble fname
+        # Order depends on actress-before-video-number
+
+        if actress_part:
+            if s['actress-before-video-number']:
+                # Actress then Number
+                fname += s['delimiter-between-video-name-actress'] + actress_part
+                if s['include-cover-all'] and s['video-number']:
+                     fname += s['delimiter-between-multiple-videos'] + s['video-number']
+            else:
+                # Number then Actress
+                if s['include-cover-all'] and s['video-number']:
+                     fname += s['delimiter-between-multiple-videos'] + s['video-number']
+                fname += s['delimiter-between-video-name-actress'] + actress_part
         else:
-            if(s['include-cover-all']):
-                if s['video-number']:
-                    fname += s['delimiter-between-multiple-videos'] + s['video-number']
+            # Just Number if exists
+            if s['include-cover-all'] and s['video-number']:
+                 fname += s['delimiter-between-multiple-videos'] + s['video-number']
 
         fullpath = os.path.join(base, fname)
         save_image_from_url_to_path(fullpath, img_link)
